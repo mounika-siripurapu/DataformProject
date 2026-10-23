@@ -1,0 +1,51 @@
+config {
+  type: "incremental",
+  schema: "ga4_staging",
+  description: "One row per GA4 event, with the event_params we need unpacked into columns. Reloads the last lookback_days on every run to pick up late events.",
+  bigquery: {
+    partitionBy: "event_date",
+    clusterBy: ["event_name", "user_pseudo_id"]
+  },
+  tags: ["daily", "staging"],
+  columns: {
+    event_date: "Date of the event in the GA4 property timezone (partition column)",
+    event_ts: "Exact event time (UTC)",
+    event_name: "GA4 event name, e.g. page_view, add_to_cart, purchase",
+    user_pseudo_id: "Anonymous browser/device ID set by GA4 (cookie based)",
+    ga_session_id: "Session ID. Unique only within one user, so always pair with user_pseudo_id",
+    session_key: "user_pseudo_id + ga_session_id: the unique session identifier",
+    engagement_time_msec: "Foreground time added by this event, in milliseconds",
+    first_user_source: "Source that FIRST acquired this user (user-level, not session-level)",
+    purchase_revenue_usd: "Revenue on purchase events, in USD"
+  },
+  assertions: {
+    nonNull: ["event_date", "event_ts", "event_name", "user_pseudo_id"]
+  }
+}
+
+pre_operations {
+  ${ga4.declareLoadFrom("event_date", self(), incremental())}
+  ${when(incremental(), `DELETE FROM ${self()} WHERE event_date >= load_from;`)}
+}
+
+SELECT
+  PARSE_DATE('%Y%m%d', event_date)                          AS event_date,
+  TIMESTAMP_MICROS(event_timestamp)                         AS event_ts,
+  event_name,
+  user_pseudo_id,
+  ${ga4.eventParam("ga_session_id", "int")}                 AS ga_session_id,
+  CONCAT(user_pseudo_id, '.', CAST(${ga4.eventParam("ga_session_id", "int")} AS STRING)) AS session_key,
+  ${ga4.eventParam("page_location")}                        AS page_location,
+  ${ga4.eventParam("source")}                               AS event_source,
+  ${ga4.eventParam("medium")}                               AS event_medium,
+  ${ga4.eventParam("campaign")}                             AS event_campaign,
+  ${ga4.eventParam("engagement_time_msec", "int")}          AS engagement_time_msec,
+  traffic_source.source                                     AS first_user_source,
+  traffic_source.medium                                     AS first_user_medium,
+  device.category                                           AS device_category,
+  geo.country                                               AS country,
+  ecommerce.transaction_id                                  AS transaction_id,
+  ecommerce.purchase_revenue_in_usd                         AS purchase_revenue_usd
+FROM ${ref("events_*")}
+WHERE _TABLE_SUFFIX >= FORMAT_DATE('%Y%m%d', load_from)
+  AND _TABLE_SUFFIX NOT LIKE 'intraday%'   -- real exports also have events_intraday_* tables; skip them

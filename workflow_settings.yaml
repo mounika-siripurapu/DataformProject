@@ -1,0 +1,17 @@
+# Project-wide settings. Every model inherits these unless its own config overrides them.
+defaultProject: YOUR_GCP_PROJECT_ID   # <-- replace with your project ID
+defaultLocation: US                   # must be US: the public GA4 sample lives in the US multi-region
+defaultDataset: ga4_staging
+defaultAssertionDataset: ga4_assertions
+dataformCoreVersion: "3.0.0"
+
+vars:
+  # Where the raw GA4 export lives (the free public sample: Google Merchandise Store, Nov 2020 - Jan 2021)
+  ga4_project: "bigquery-public-data"
+  ga4_dataset: "ga4_obfuscated_sample_ecommerce"
+
+  # First date to load on a full refresh
+  start_date: "2020-11-01"
+
+  # GA4 events can arrive up to ~72h late, so every incremental run reloads the last N days
+  lookback_days: "3"

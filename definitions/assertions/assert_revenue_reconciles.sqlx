@@ -1,0 +1,23 @@
+config {
+  type: "assertion",
+  description: "Reconciliation: total purchase revenue in fct_sessions must equal the raw purchase events in staging. Returns a row (= fails) if they differ by more than 1 cent.",
+  tags: ["daily", "quality"]
+}
+
+WITH staging AS (
+  SELECT COALESCE(SUM(purchase_revenue_usd), 0) AS revenue_usd
+  FROM ${ref("stg_ga4__events")}
+  WHERE event_name = 'purchase'
+    AND ga_session_id IS NOT NULL
+),
+
+fact AS (
+  SELECT COALESCE(SUM(revenue_usd), 0) AS revenue_usd
+  FROM ${ref("fct_sessions")}
+)
+
+SELECT
+  staging.revenue_usd AS staging_revenue_usd,
+  fact.revenue_usd    AS fact_revenue_usd
+FROM staging CROSS JOIN fact
+WHERE ABS(staging.revenue_usd - fact.revenue_usd) > 0.01

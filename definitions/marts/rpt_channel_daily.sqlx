@@ -1,0 +1,41 @@
+config {
+  type: "table",
+  schema: "ga4_marts",
+  description: "Reporting table for Looker Studio, grain = one row per day per channel. Every metric is defined here once, so all dashboards show the same numbers.",
+  bigquery: {
+    partitionBy: "session_date"
+  },
+  tags: ["daily", "marts", "reporting"],
+  columns: {
+    sessions: "Number of sessions",
+    engaged_sessions: "Sessions meeting the GA4 engaged definition",
+    engagement_rate: "engaged_sessions / sessions",
+    users: "Distinct user_pseudo_id (browsers/devices, not people)",
+    conversion_rate: "Sessions with a purchase / sessions",
+    revenue_usd: "Total purchase revenue, USD"
+  },
+  assertions: {
+    uniqueKey: ["session_date", "channel_group"],
+    rowConditions: [
+      "engaged_sessions <= sessions",
+      "sessions_purchase <= sessions_begin_checkout OR sessions_begin_checkout = 0"
+    ]
+  }
+}
+
+SELECT
+  session_date,
+  channel_group,
+  COUNT(*)                                          AS sessions,
+  COUNTIF(is_engaged)                               AS engaged_sessions,
+  SAFE_DIVIDE(COUNTIF(is_engaged), COUNT(*))        AS engagement_rate,
+  COUNT(DISTINCT user_pseudo_id)                    AS users,
+  COUNTIF(reached_view_item)                        AS sessions_view_item,
+  COUNTIF(reached_add_to_cart)                      AS sessions_add_to_cart,
+  COUNTIF(reached_begin_checkout)                   AS sessions_begin_checkout,
+  COUNTIF(reached_purchase)                         AS sessions_purchase,
+  SAFE_DIVIDE(COUNTIF(reached_purchase), COUNT(*))  AS conversion_rate,
+  SUM(purchases)                                    AS purchases,
+  SUM(revenue_usd)                                  AS revenue_usd
+FROM ${ref("fct_sessions")}
+GROUP BY session_date, channel_group

@@ -1,0 +1,77 @@
+config {
+  type: "incremental",
+  schema: "ga4_marts",
+  description: "Fact table, grain = one row per GA4 session. Session source/medium, landing page, engagement, funnel flags and revenue.",
+  bigquery: {
+    partitionBy: "session_date",
+    clusterBy: ["channel_group"]
+  },
+  tags: ["daily", "marts"],
+  columns: {
+    session_key: "Unique session ID (user_pseudo_id + ga_session_id)",
+    session_date: "Date the session started (property timezone)",
+    session_source: "Traffic source of the session = first non-null source seen in the session",
+    session_medium: "Traffic medium of the session = first non-null medium seen in the session",
+    channel_group: "Simplified GA4 default channel grouping (Direct, Organic Search, Paid Search, ...)",
+    landing_page: "First page_view URL of the session",
+    is_engaged: "GA4 definition: > 10s engagement OR 2+ page views OR a purchase",
+    reached_view_item: "Funnel step 1: viewed a product",
+    reached_add_to_cart: "Funnel step 2: added to cart",
+    reached_begin_checkout: "Funnel step 3: started checkout",
+    reached_purchase: "Funnel step 4: purchased",
+    revenue_usd: "Purchase revenue in the session, USD"
+  },
+  assertions: {
+    uniqueKey: ["session_key"],
+    nonNull: ["session_key", "session_date", "channel_group"],
+    rowConditions: [
+      "revenue_usd >= 0",
+      "session_end_ts >= session_start_ts"
+    ]
+  }
+}
+
+pre_operations {
+  ${ga4.declareLoadFrom("session_date", self(), incremental())}
+  ${when(incremental(), `DELETE FROM ${self()} WHERE session_date >= load_from;`)}
+}
+
+WITH events AS (
+  -- read 1 extra day so sessions that cross midnight are complete
+  SELECT *
+  FROM ${ref("stg_ga4__events")}
+  WHERE event_date >= DATE_SUB(load_from, INTERVAL 1 DAY)
+    AND ga_session_id IS NOT NULL
+),
+
+sessions AS (
+  SELECT
+    session_key,
+    ANY_VALUE(user_pseudo_id)                                                      AS user_pseudo_id,
+    MIN(event_date)                                                                AS session_date,
+    MIN(event_ts)                                                                  AS session_start_ts,
+    MAX(event_ts)                                                                  AS session_end_ts,
+    ARRAY_AGG(event_source   IGNORE NULLS ORDER BY event_ts LIMIT 1)[SAFE_OFFSET(0)] AS session_source,
+    ARRAY_AGG(event_medium   IGNORE NULLS ORDER BY event_ts LIMIT 1)[SAFE_OFFSET(0)] AS session_medium,
+    ARRAY_AGG(event_campaign IGNORE NULLS ORDER BY event_ts LIMIT 1)[SAFE_OFFSET(0)] AS session_campaign,
+    ARRAY_AGG(IF(event_name = 'page_view', page_location, NULL) IGNORE NULLS ORDER BY event_ts LIMIT 1)[SAFE_OFFSET(0)] AS landing_page,
+    ANY_VALUE(device_category)                                                     AS device_category,
+    ANY_VALUE(country)                                                             AS country,
+    COUNTIF(event_name = 'page_view')                                              AS page_views,
+    COALESCE(SUM(engagement_time_msec), 0)                                         AS engagement_time_msec,
+    COUNTIF(event_name = 'view_item') > 0                                          AS reached_view_item,
+    COUNTIF(event_name = 'add_to_cart') > 0                                        AS reached_add_to_cart,
+    COUNTIF(event_name = 'begin_checkout') > 0                                     AS reached_begin_checkout,
+    COUNTIF(event_name = 'purchase') > 0                                           AS reached_purchase,
+    COUNT(DISTINCT IF(event_name = 'purchase', transaction_id, NULL))              AS purchases,
+    COALESCE(SUM(IF(event_name = 'purchase', purchase_revenue_usd, 0)), 0)         AS revenue_usd
+  FROM events
+  GROUP BY session_key
+)
+
+SELECT
+  *,
+  ${ga4.channelGroup("session_source", "session_medium")} AS channel_group,
+  (engagement_time_msec > 10000 OR page_views >= 2 OR purchases > 0) AS is_engaged
+FROM sessions
+WHERE session_date >= load_from

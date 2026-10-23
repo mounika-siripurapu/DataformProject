@@ -1,0 +1,7 @@
+config {
+  type: "declaration",
+  database: dataform.projectConfig.vars.ga4_project,
+  schema: dataform.projectConfig.vars.ga4_dataset,
+  name: "events_*",
+  description: "Raw GA4 BigQuery export: one table per day (events_YYYYMMDD), one row per event. Public obfuscated sample of the Google Merchandise Store."
+}
