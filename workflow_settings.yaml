@@ -1,5 +1,5 @@
 # Project-wide settings. Every model inherits these unless its own config overrides them.
-defaultProject: YOUR_GCP_PROJECT_ID   # <-- replace with your project ID
+defaultProject: project-9b7e0325-e559-4c1c-a53   # project ID (not the display name "My First Project")
 defaultLocation: US                   # must be US: the public GA4 sample lives in the US multi-region
 defaultDataset: ga4_staging
 defaultAssertionDataset: ga4_assertions
