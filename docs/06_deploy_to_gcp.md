@@ -245,4 +245,45 @@ Creating a Dataform repository makes Google create the service agent **and** off
 | `--service=dataform.googleapis.com` | which service: Dataform |
 | `--project=...` | which project: the project **ID** |
 
-**Source:** the official Dataform quickstart (docs.cloud.google.com/dataform/docs/quickstart-create-workflow) uses this exact setup: a custom service account with the BigQuery roles, plus the Dataform service agent granted Service Account User and Token Creator.
+**Source (Step 3):** the official Dataform quickstart (docs.cloud.google.com/dataform/docs/quickstart-create-workflow) uses this exact setup: a custom service account with the BigQuery roles, plus the Dataform service agent granted Service Account User and Token Creator.
+
+---
+
+## Step 4: GitHub token in Secret Manager
+
+**What / why:** Dataform must read and write the GitHub repo. A **fine-grained token** is a password limited to one repo and one permission. It's kept in **Secret Manager** (Google's password safe), so it never appears in code. *Informatica: an encrypted password in the connection object.*
+**Never paste the token into chat, a file or a screenshot.**
+
+Fine-grained vs classic: fine-grained = chosen repos + chosen permissions (least privilege). Classic = every repo I own.
+
+### 4a. Create the token on GitHub
+1. github.com → **profile photo** (top right) → **Settings**
+2. Left menu, very bottom → **Developer settings**. The breadcrumb shows *Settings / Developer Settings*.
+3. **Personal access tokens → Fine-grained tokens**. First time it says "No fine-grained tokens created".
+4. **Generate new token** (green). GitHub may ask for my password or 2FA code.
+5. Fill in:
+
+| Field | Value | Why |
+|---|---|---|
+| Token name | `dataform-gcp` | Says what uses it |
+| Description | `Dataform in GCP project My First Project reads/writes DataformProject` (optional) | Future me knows what it's for |
+| Resource owner | leave `mounika-siripurapu` | Repo is under my account |
+| Expiration | **90 days** | Tokens should expire; renew later |
+| Repository access | **Only select repositories** → **DataformProject** | Can't touch other repos |
+| Permissions | **+ Add permissions** → search **`Contents`** → tick → set **Read and write** | Contents = files. Dataform reads SQLX, writes when committing from a workspace |
+| (automatic) | **Metadata: Read-only** | Added by GitHub; required |
+| Everything else | leave empty | Least privilege |
+
+6. **Generate token** → copy it (`github_pat_...`) with the copy icon. It's shown **only once**.
+
+**Issue I hit:** searching `Repo` in *Add permissions* lists "GitHub App installation repository access", "Repository creation", "Repository license policy" and "Repository security advisories". **None are needed.** Clear the box, search **`Contents`**, tick it, close the dropdown, then change it from Read-only to **Read and write**.
+
+### 4b. Save it in Secret Manager
+1. Console search bar → `Secret Manager` → **+ Create secret**
+2. Name `github-dataform-token`; Secret value: paste the token; leave the rest default → **Create secret**
+
+### 4c. Let Dataform read the secret
+1. On the secret → **Permissions** tab → **Grant access**
+2. New principals `service-247830772883@gcp-sa-dataform.iam.gserviceaccount.com` → role **Secret Manager Secret Accessor** → **Save**
+
+Source: docs.cloud.google.com/dataform/docs/connect-repository. GitHub over HTTPS uses a token in Secret Manager. Fine-grained token: selected repository, "read and write access on contents". The Dataform service agent needs `roles/secretmanager.secretAccessor` on the secret.
