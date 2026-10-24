@@ -49,4 +49,4 @@ ga4_assertions.*                 data quality checks after every run
 cd C:\Users\mouni\ga4-marketing-dataform
 npx @dataform/cli@3.0.0 compile
 ```
-If it prints the list of actions with no errors, every file, `ref()` and config is valid.
+If it prints the list of actions with no errors, every file, `ref()` and config is valid. ok
