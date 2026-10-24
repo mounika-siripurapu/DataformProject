@@ -6,6 +6,7 @@ config {
     partitionBy: "session_date"
   },
   tags: ["daily", "marts", "reporting"],
+  dependOnDependencyAssertions: true,   // run only if fct_sessions' assertions pass
   columns: {
     sessions: "Number of sessions",
     engaged_sessions: "Sessions meeting the GA4 engaged definition",

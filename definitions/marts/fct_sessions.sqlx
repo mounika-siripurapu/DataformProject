@@ -7,6 +7,7 @@ config {
     clusterBy: ["channel_group"]
   },
   tags: ["daily", "marts"],
+  dependOnDependencyAssertions: true,   // run only if staging's assertions pass (default false = run anyway)
   columns: {
     session_key: "Unique session ID (user_pseudo_id + ga_session_id)",
     session_date: "Date the session started (property timezone)",

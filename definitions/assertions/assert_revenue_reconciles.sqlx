@@ -4,9 +4,12 @@ config {
   tags: ["daily", "quality"]
 }
 
+-- resolve() (not ref()) on staging: no dependency on stg_ga4__events, otherwise Dataform treats this as one of
+-- staging's assertions and fct_sessions (dependOnDependencyAssertions) would wait for it -> circular dependency.
+-- Order is still safe: this depends on fct_sessions, which depends on staging.
 WITH staging AS (
   SELECT COALESCE(SUM(purchase_revenue_usd), 0) AS revenue_usd
-  FROM ${ref("stg_ga4__events")}
+  FROM ${resolve("stg_ga4__events")}
   WHERE event_name = 'purchase'
     AND ga_session_id IS NOT NULL
 ),
