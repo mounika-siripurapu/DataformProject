@@ -13,5 +13,6 @@ vars:
   # First date to load on a full refresh
   start_date: "2020-11-01"
 
-  # GA4 events can arrive up to ~72h late, so every incremental run reloads the last N days
+  # GA4 "will update daily tables for up to 2 calendar days, plus today" (Analytics Help: BigQuery Export),
+  # so every incremental run deletes and reloads the last 3 days
   lookback_days: "3"

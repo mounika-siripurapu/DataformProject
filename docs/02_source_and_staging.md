@@ -26,7 +26,7 @@ Every run does this (see `pre_operations`):
 2. `DELETE` the table rows from `load_from` onwards
 3. `INSERT` fresh data from `load_from` onwards
 
-**Why go back 3 days?** GA4 can deliver events **up to 72 hours late**. Reloading the recent days picks them up. The run is also **re-runnable (idempotent)**: running it twice gives the same result, never duplicates.
+**Why go back 3 days?** Google: Analytics "will update daily tables for up to 2 calendar days, plus today" (Analytics Help, *BigQuery Export*). So a day keeps changing for 3 days, and reloading the last 3 picks up every late event. The run is also **re-runnable (idempotent)**: running it twice gives the same result, never duplicates.
 Informatica: incremental load using the last run date, plus deleting the target slice before reloading. It's the same pattern as Crown's slice-replace.
 
 On a **full refresh** (first run, or forced), it starts from `vars.start_date` instead.

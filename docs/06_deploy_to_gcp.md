@@ -15,7 +15,7 @@ VS Code (laptop)  ->  git push  ->  GitHub  ->  Dataform (GCP)  ->  BigQuery
 | 3 | Service account + roles | GCP IAM | ✅ done (3b via "Grant all") |
 | 4 | GitHub token into Secret Manager | GitHub + GCP | ✅ done |
 | 5 | Dataform repository connected to GitHub | GCP Dataform | ✅ done (linked over HTTPS, branch main) |
-| 6 | Workspace, pull, first run | GCP Dataform | ⏳ |
+| 6 | Workspace, pull, first run | GCP Dataform | ✅ done 24 Oct: all 9 actions succeeded |
 | 7 | Release + workflow configuration (daily schedule) | GCP Dataform | ⏳ |
 
 ## My details
