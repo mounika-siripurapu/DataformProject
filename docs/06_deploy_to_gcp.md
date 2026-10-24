@@ -12,9 +12,9 @@ VS Code (laptop)  ->  git push  ->  GitHub  ->  Dataform (GCP)  ->  BigQuery
 |---|---|---|---|
 | 1 | Push project to GitHub | VS Code + GitHub | ✅ done |
 | 2 | Enable APIs | GCP console | ✅ done |
-| 3 | Service account + roles | GCP IAM | ⏳ |
+| 3 | Service account + roles | GCP IAM | ✅ done (3b via "Grant all") |
 | 4 | GitHub token into Secret Manager | GitHub + GCP | ⏳ |
-| 5 | Dataform repository connected to GitHub | GCP Dataform | ⏳ |
+| 5 | Dataform repository connected to GitHub | GCP Dataform | 🟡 repository `ga4-marketing-dataform` created (us-central1); GitHub connection pending |
 | 6 | Workspace, pull, first run | GCP Dataform | ⏳ |
 | 7 | Release + workflow configuration (daily schedule) | GCP Dataform | ⏳ |
 
@@ -143,6 +143,36 @@ Two accounts are involved:
 6. ✅ The list now shows `dataform-runner@project-9b7e0325-e559-4c1c-a53.iam.gserviceaccount.com`.
 
 ### 3b. Let Dataform act as the robot
+
+**Where:** the Service Accounts page, the same page as 3a.
+Direct link: https://console.cloud.google.com/iam-admin/serviceaccounts?project=project-9b7e0325-e559-4c1c-a53
+Or click: ☰ menu (top left) → **IAM & Admin** → **Service Accounts**.
+
+```
+Service Accounts list
+ └─ click dataform-runner@...        <- the robot's own page
+     └─ tab "Principals with access"  (older console: "Permissions")
+         └─ Grant access -> paste agent email -> 2 roles -> Save
+```
+
+**How the agent email is built.** Google names its built-in accounts ("service agents") with a fixed rule:
+
+```
+service-<PROJECT NUMBER>@gcp-sa-<SERVICE NAME>.iam.gserviceaccount.com
+```
+
+| Part | My value | From |
+|---|---|---|
+| `service-` | fixed | Google's rule |
+| `247830772883` | project **number** | Dashboard → Project info |
+| `@gcp-sa-` | fixed ("Google Cloud service agent") | Google's rule |
+| `dataform` | the service | Dataform |
+| `.iam.gserviceaccount.com` | fixed | all service accounts end like this |
+
+That's why this step needs the project **number**, not the ID. The official Dataform docs give this pattern.
+To see it: **IAM & Admin → IAM** → tick **Include Google-provided role grants**. It only appears once it exists (see the error below).
+
+**Steps:**
 1. In the Service Accounts list, click the email **dataform-runner@...**
 2. Open the **Principals with access** tab → click **Grant access**.
 3. **New principals:** `service-247830772883@gcp-sa-dataform.iam.gserviceaccount.com`
@@ -164,7 +194,55 @@ Console → **IAM & Admin → IAM**:
 ### Errors you may hit
 | Error | Meaning | Fix |
 |---|---|---|
-| In 3b: "Email addresses and domains must be associated with an active Google Account" | The Dataform service agent doesn't exist yet. Google only creates it when Dataform is first used | Open **Cloud Shell** (the `>_` icon at the top right) and run: `gcloud beta services identity create --service=dataform.googleapis.com --project=project-9b7e0325-e559-4c1c-a53`. Then repeat 3b |
+| In 3b: "Email addresses and domains must be associated with an active Google Account, Google Workspace account, or Cloud Identity account." **(I hit this on my new project.)** | The Dataform service agent doesn't exist yet. Google only creates it when Dataform is first used | Create it with Cloud Shell (see below), then repeat 3b |
 | A role isn't in the list | Typo in the filter, or the API isn't enabled | Check Step 2, then type part of the name, e.g. `Job User` |
+
+### Easiest fix (what I did): create the Dataform repository first
+
+Creating a Dataform repository makes Google create the service agent **and** offers a **Grant all** button that does 3b in one click.
+
+1. Console search bar → `Dataform` → click **Dataform** (BigQuery).
+   Direct link: https://console.cloud.google.com/bigquery/dataform?project=project-9b7e0325-e559-4c1c-a53
+2. Click **+ Create repository** and fill in:
+
+| Field | Value | Why |
+|---|---|---|
+| Repository ID | `ga4-marketing-dataform` | Name of the repo inside Dataform |
+| Region | `us-central1 (Iowa)` | US, same as the GA4 sample data |
+| Service account | `dataform-runner` | The robot from 3a |
+| Encryption settings | leave **"Use the default KMS key for encryption"** ticked ("No default key set") | Google encrypts everything anyway. This is only for companies with their own key (KMS). "No default key set" = Google-managed key, normal and free |
+
+   Note: the form says "New repositories start empty and can be connected to a git provider after being created." There's no actAs option on the current form.
+3. Click **Create**.
+4. ✅ The screen shows:
+   - "Repository created successfully."
+   - "Dataform will execute workflows as the service account dataform-runner@project-9b7e0325-e559-4c1c-a53.iam.gserviceaccount.com."
+   - A yellow box: "To execute queries in Dataform, you need the following roles: for **service-247830772883@gcp-sa-dataform.iam.gserviceaccount.com**: roles/iam.serviceAccountTokenCreator and roles/iam.serviceAccountUser on dataform-runner@..."
+   - This confirms the agent email from the naming rule.
+5. Click **Grant all**. That's the same as 3b, done in one click.
+6. Click **Go to repositories**.
+
+### Alternative fix: create the Dataform service agent with Cloud Shell
+
+**Cloud Shell** is a free Linux terminal inside the browser, already logged in as me, with `gcloud` (Google Cloud's command-line tool) installed. Nothing to install.
+
+1. Console, top right → click the **`>_` icon** ("Activate Cloud Shell").
+2. **First time only:** a screen shows "Provisioning your Cloud Shell machine → Connecting to your Cloud Shell instance → Connecting to your Cloud Shell Editor". This takes **1–3 minutes** while Google creates a small VM for me. Later opens are faster.
+3. If it opens the **Cloud Shell Editor** (looks like VS Code), the terminal is the panel at the bottom. If there isn't one: menu **Terminal → New Terminal**.
+4. Wait for the prompt: `...@cloudshell:~ (project-9b7e0325-e559-4c1c-a53)$`
+5. Type, then press Enter:
+   ```
+   gcloud beta services identity create --service=dataform.googleapis.com --project=project-9b7e0325-e559-4c1c-a53
+   ```
+6. Popup **"Authorize Cloud Shell"** → click **Authorize**. If asked to install the beta component → type `Y`.
+7. ✅ Expected: `Service identity created: service-247830772883@gcp-sa-dataform.iam.gserviceaccount.com`
+8. Repeat **3b**. If it still errors, wait 1 minute (new accounts take a moment to appear) and try again.
+
+| Command part | Meaning |
+|---|---|
+| `gcloud` | Google Cloud's command-line tool |
+| `beta services identity create` | "Create the built-in service account (identity) for a service" |
+| `--service=dataform.googleapis.com` | which service: Dataform |
+| `--project=...` | which project: the project **ID** |
 
 **Source:** the official Dataform quickstart (docs.cloud.google.com/dataform/docs/quickstart-create-workflow) uses this exact setup: a custom service account with the BigQuery roles, plus the Dataform service agent granted Service Account User and Token Creator.
