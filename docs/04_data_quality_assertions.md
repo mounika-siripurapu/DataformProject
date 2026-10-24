@@ -10,7 +10,7 @@ Informatica: a validation session after the load that fails the workflow.
 | fct_sessions | `uniqueKey: session_key` | Duplicate sessions (bad join or double load) |
 | fct_sessions | `revenue_usd >= 0`, end ≥ start | Bad data / logic bugs |
 | rpt_channel_daily | `uniqueKey: date + channel` | Grain broken |
-| rpt_channel_daily | engaged ≤ sessions, purchases ≤ checkouts | Funnel logic bugs |
+| rpt_channel_daily | engaged ≤ sessions, purchase sessions ≤ sessions | Logic bugs (funnel steps are NOT strictly nested per session in GA4: checkout can be in an earlier session) |
 
 ## Custom assertion
 `definitions/assertions/assert_revenue_reconciles.sqlx`: total revenue in `fct_sessions` must equal the raw purchase events in staging.

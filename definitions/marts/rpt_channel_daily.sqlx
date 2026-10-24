@@ -18,7 +18,7 @@ config {
     uniqueKey: ["session_date", "channel_group"],
     rowConditions: [
       "engaged_sessions <= sessions",
-      "sessions_purchase <= sessions_begin_checkout OR sessions_begin_checkout = 0"
+      "sessions_purchase <= sessions"
     ]
   }
 }
